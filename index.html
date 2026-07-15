@@ -242,6 +242,18 @@
           loading="eager"
         ></iframe>
       </div>
+
+      <div
+        id="fastLinksWrap"
+        class="hidden p-4 sm:p-5 border-t border-white/10 bg-black/20"
+      >
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h3 class="font-semibold text-slate-100">Fast links</h3>
+          <span class="text-xs text-slate-400">World Cup only</span>
+        </div>
+
+        <div id="fastLinks" class="flex flex-wrap gap-3"></div>
+      </div>
     </section>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6">
@@ -404,10 +416,26 @@
     <script>
       const API_URL = "https://streamfree.top/api/v1/streams";
 
+      const WORLD_CUP_FAST_LINKS = [
+        {
+          label: "Stream 1",
+          url: "https://live05.miekgo.app/live/78905744.m3u8",
+        },
+        {
+          label: "Stream 2",
+          url: "https://live05.miekgo.app/live/08552895.m3u8",
+        },
+        {
+          label: "Stream 3",
+          url: "https://live05.miekgo.app/live/24561735.m3u8",
+        },
+      ];
+
       let streams = [];
       let filtered = [];
       let currentCategory = "All";
       let featuredMatch = null;
+      let currentStream = null;
 
       const grid = document.getElementById("grid");
       const loading = document.getElementById("loading");
@@ -418,6 +446,8 @@
       const player = document.getElementById("player");
       const featuredSection = document.getElementById("featured");
       const featuredWrap = document.getElementById("featuredWrap");
+      const fastLinksWrap = document.getElementById("fastLinksWrap");
+      const fastLinks = document.getElementById("fastLinks");
 
       function escapeHtml(value = "") {
         return String(value)
@@ -506,6 +536,44 @@
         });
       }
 
+      function setPlayerSource(url, button = null) {
+        playerLoading.classList.remove("hidden");
+        player.src = url;
+
+        if (button) {
+          document.querySelectorAll("#fastLinks button").forEach((btn) => {
+            btn.className =
+              "px-4 py-2 rounded-2xl border transition bg-slate-900/80 text-slate-200 border-slate-700/70 hover:bg-slate-800";
+          });
+          button.className =
+            "px-4 py-2 rounded-2xl border transition bg-rose-500 text-white border-rose-400/40";
+        }
+
+        player.onload = () => {
+          playerLoading.classList.add("hidden");
+        };
+      }
+
+      function renderFastLinks(stream) {
+        if (!isWorldCup(stream)) {
+          fastLinksWrap.classList.add("hidden");
+          fastLinks.innerHTML = "";
+          return;
+        }
+
+        fastLinksWrap.classList.remove("hidden");
+
+        fastLinks.innerHTML = WORLD_CUP_FAST_LINKS.map(
+          (link) => `
+      <button
+        class="px-4 py-2 rounded-2xl border transition bg-slate-900/80 text-slate-200 border-slate-700/70 hover:bg-slate-800"
+        onclick="setPlayerSource('${escapeHtml(link.url)}', this)"
+      >
+        ${escapeHtml(link.label)}
+      </button>
+    `,
+        ).join("");
+      }
       function renderFeatured() {
         const worldCupMatches = streams.filter(isWorldCup).slice(0, 4);
 
@@ -690,24 +758,24 @@
         });
       }
 
-      function play(stream) {
-        if (!stream?.embed_url) return;
+      function play(stream, sourceUrl = null) {
+        if (!stream?.embed_url && !sourceUrl) return;
+
+        currentStream = stream;
 
         document.getElementById("playerTitle").innerText =
           stream.name || "Live Stream";
         document.getElementById("playerLeague").innerText = stream.league || "";
 
         playerSection.classList.remove("hidden");
-        playerLoading.classList.remove("hidden");
-        player.src = stream.embed_url;
+        renderFastLinks(stream);
+
+        // Default: always load the normal stream first
+        const finalUrl = sourceUrl || stream.embed_url;
+        setPlayerSource(finalUrl);
 
         playerSection.scrollIntoView({ behavior: "smooth", block: "start" });
-
-        player.onload = () => {
-          playerLoading.classList.add("hidden");
-        };
       }
-
       function playFirstAvailable() {
         const first =
           streams.find(isWorldCup) || filtered[0] || streams[0] || null;
